@@ -18,11 +18,16 @@ import graph as gr
 
 database = gr.Database("Iris")
 database.addParameters("IrisDataTrain.csv")
-print(database.graph.Nodes)
 database.addColumn("IrisDataTrain.csv", "sle")
+database.addColumn("IrisDataTrain.csv", "swi")
+database.addColumn("IrisDataTrain.csv", "ple")
+database.addColumn("IrisDataTrain.csv", "pwi")
+#database.addColumn("IrisDataTrain.csv", "class")
+
+# print(database.maxima)
+# database.addValue(8.1, "Param_sle")
+# print(database.maxima)
+# database.addValue(7.8, "Param_sle")
+
 print(database.graph.Nodes)
 
-print(database.graph.getNodeByName("sle7.6"))
-print(database.graph.getNodeByName("sle7.5"))
-print(database.graph.getNodeByValue(7.6, "sle"))
-print(database.graph.getNodeByValue(7.8, "sle"))
