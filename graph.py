@@ -170,7 +170,7 @@ class Database:
         self.objectCount += 1
         name = "Obj" + str(self.objectCount)
         node = self.graph.addNode(name,"object", None)
-        for i in range(len(self.headers)):
+        for i in range(len(fields)):
             param = self.addValue(fields[i],"Param_"+str(self.headers[i]))
             if param:
                 self.graph.addEdge(name, param.name)
@@ -216,6 +216,7 @@ class Database:
                 node = self.graph.getGreaterNode(node.name)
 
     def setSimilarityValues(self, node, column):
+        '''Given a node and a parameter method calculates similarity for each value of parameter'''
         param = self.graph.getParamNode(node, column)
         temp = param.rate
         param.rate = 1
@@ -241,9 +242,9 @@ class Database:
             high = self.graph.getGreaterNode(param.name)
 
     def setObjectRate(self, node):
-        fact = 1/len(self.maxima)
+        factor = 1/len(self.maxima)
         for param in node.edges:
-            node.rate += fact * self.graph.getParamNode(node, param).rate
+            node.rate += factor * self.graph.getParamNode(node, param).rate
         return node.rate
 
     def getSimilarity(self, node):
@@ -257,4 +258,29 @@ class Database:
         objList = []
         for i in names:
             objList.append(self.graph.getNodeByName(i[0]))
+        for nd in self.graph.Nodes:
+            nd.rate = 0
         return objList
+
+    def getClassPrediction(self, fields):
+        node = self.addSingleObject(fields)
+        for i in range(len(fields)):
+            self.setSimilarityValues(node, self.headers[i])
+        similarNodes = dict()
+        corr = len(self.headers)/(len(self.headers)-1)
+        prediction = [0] * len(self.graph.getNodeByName("Param_class").edges)
+        counts = [0] * len(self.graph.getNodeByName("Param_class").edges)
+        for obj in self.graph.Nodes:
+            if obj.type == "object":
+                similarNodes[obj.name] = self.setObjectRate(obj)*corr
+                if node.name != obj.name:
+                    for i in range(len(prediction)):
+                        if obj.edges[len(self.headers)-1] == self.graph.getNodeByName("Param_class").edges[i]:
+                            prediction[i] += similarNodes[obj.name]
+                            counts[i] += 1
+        for i in range(len(prediction)):
+            prediction[i] = prediction[i]/counts[i]
+        self.delSingleObject(node.name)
+        for nd in self.graph.Nodes:
+            nd.rate = 0
+        return prediction

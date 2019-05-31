@@ -1,4 +1,5 @@
 import graph as gr
+import pandas as pd
 from datetime import datetime
 
 # node1 = gr.Node("Node1", "param", "sle", [])
@@ -49,3 +50,10 @@ node = database.addSingleObject([7.8,3.5,0.9,2.6,1.0])
 print(database.graph.Nodes)
 database.delSingleObject(node.name)
 print(database.graph.Nodes)
+print(database.getClassPrediction([4.6, 3.4, 1.4, 0.3]))
+print(database.getClassPrediction([4.8, 3.0, 1.4, 0.1]))
+with open("IrisDataTest.csv") as csv_file:
+    df = pd.read_csv(csv_file)
+    data = df.values.tolist()
+    for i in data:
+        print(100*max(database.getClassPrediction(i)))
