@@ -1,5 +1,6 @@
 import csv
 import pandas as pd
+import math as m
 
 class Node:
 
@@ -8,9 +9,10 @@ class Node:
         self.type = type
         self.value = value
         self.edges = edges
+        self.rate = 0
 
     def __repr__(self):
-        return "\nName: " + str(self.name) + ", type: " + str(self.type) + ", value: " + str(self.value) + ", connected nodes: " + str(self.edges)
+        return "\nName: " + str(self.name) + ", type: " + str(self.type) + ", value: " + str(self.value) + ", connected nodes: " + str(self.edges) + ", similarity index: " + str(self.rate)
 
 
 class Graph:
@@ -30,6 +32,9 @@ class Graph:
             node = self.Nodes[len(self.Nodes)-1]
         return node
 
+    def delNode(self, name):
+        pass
+
     def addEdge(self, name1, name2):
         if (self.getNodeByName(name1) or name1 == "NULL") and (self.getNodeByName(name2) or name2 == "NULL"):
             if name1 == "NULL":
@@ -40,6 +45,8 @@ class Graph:
                 self.getNodeByName(name1).edges.append(name2)
                 self.getNodeByName(name2).edges.append(name1)
 
+    def delEdge(self):
+        pass
 
     def getNodeByName(self, name):
         for i in range(len(self.Nodes)):
@@ -59,6 +66,11 @@ class Graph:
         #print(msg)
         return None
 
+    def getParamNode(self, node, param):
+        for i in range(len(node.edges)):
+            if param in node.edges[i]:
+                return self.getNodeByName(node.edges[i])
+
     def getLowerNode(self, name):
         return self.getNodeByName(self.getNodeByName(name).edges[1])
 
@@ -72,19 +84,26 @@ class Database:
 
     def __init__(self, name):
         self.graph = Graph(name)
+        self.objectCount = 0
+
+    def loadData(self, filename):
+        self.addParameters(filename)
+        self.addObjects(filename)
 
     def addParameters(self, filename):
         with open(filename) as csv_file:
             d_reader = csv.DictReader(csv_file)
-            headers = d_reader.fieldnames
-            print(headers)
-            for i in range(len(headers)):
-                param = "Param_" + str(headers[i])
-                self.graph.addNode(param, "param", headers[i])
+            self.headers = d_reader.fieldnames
+            print(self.headers)
+            for i in range(len(self.headers)):
+                param = "Param_" + str(self.headers[i])
+                self.graph.addNode(param, "param", self.headers[i])
+                self.addColumn(filename, self.headers[i])
 
     def addValue(self, value, column):
         if self.graph.getNodeByValue(value, column):
-            print("Value already exists")
+            #print("Value already exists")
+            return None
         else:
             name = column + str(value)
             node = self.graph.addNode(name, "value", value)
@@ -110,6 +129,22 @@ class Database:
                     nextNode.edges[1] = name
             return node
 
+    def delValue(self, name):
+        param = self.graph.getNodeByName(name)
+        col = name[6:9]
+        if not param:
+            return "Value already deleted"
+        if len(param.edges) > 3:
+            return "Value still used"
+        if param.edges[1] == "NULL":
+            self.minima[col] = self.graph.getGreaterNode(name).edges[1] = 'NULL'
+        elif param.edges[2] == "NULL":
+            self.maxima[col] = self.graph.getLowerNode(name).edges[2] = 'NULL'
+        else:
+            self.graph.getGreaterNode(param.name).edges[1] = param.edges[1]
+            self.graph.getLowerNode(param.name).edges[2] = param.edges[2]
+        self.graph.Nodes.remove(param)
+
     def addColumn(self, filename, column):
         with open(filename) as csv_file:
             df = pd.read_csv(csv_file)
@@ -130,3 +165,96 @@ class Database:
                     self.graph.addEdge(col + str(saved_column[i]), "NULL")
                 else:
                     self.graph.addEdge(col + str(saved_column[i]), col + str(saved_column[i + 1]))
+
+    def addSingleObject(self, fields):
+        self.objectCount += 1
+        name = "Obj" + str(self.objectCount)
+        node = self.graph.addNode(name,"object", None)
+        for i in range(len(self.headers)):
+            param = self.addValue(fields[i],"Param_"+str(self.headers[i]))
+            if param:
+                self.graph.addEdge(name, param.name)
+            else:
+                self.graph.addEdge(name, "Param_"+str(self.headers[i])+str(fields[i]))
+        return node
+
+    def delSingleObject(self, name):
+        node = self.graph.getNodeByName(name)
+        if not node:
+            return "Object already deleted"
+        for paramName in node.edges:
+            param = self.graph.getNodeByName(paramName)
+            param.edges.remove(name)
+            if len(param.edges) < 4:
+                self.delValue(paramName)
+        self.graph.Nodes.remove(node)
+
+
+    def addObjects(self, filename):
+        with open(filename) as csv_file:
+            obj = pd.read_csv(csv_file).values
+            for i in range(len(obj)):
+                self.addSingleObject(obj[i,:])
+
+    def getAverage(self, column):
+        param = self.graph.getNodeByName("Param_"+str(column))
+        sum = 0
+        count = 0
+        for i in range(len(param.edges)):
+            node = self.graph.getNodeByName(param.edges[i])
+            sum += node.value*(len(node.edges)-3)
+            count += len(node.edges)-3
+        return sum/count
+
+    def getMedian(self, column):
+        node = self.minima["Param_" + str(column)]
+        c = 0
+        if self.objectCount % 2 == 0:
+            middle = m.floor(self.objectCount/2)
+            while c != middle:
+                c += (len(node.edges)-3)
+                node = self.graph.getGreaterNode(node.name)
+
+    def setSimilarityValues(self, node, column):
+        param = self.graph.getParamNode(node, column)
+        temp = param.rate
+        param.rate = 1
+        low = self.graph.getLowerNode(param.name)
+        high = self.graph.getGreaterNode(param.name)
+        rang = self.maxima["Param_"+column].value-self.minima["Param_"+column].value
+
+        while low:
+            weight = 1 - abs(param.value-low.value)/rang
+            low.rate = temp * weight
+            temp = low.rate
+            param = low
+            low = self.graph.getLowerNode(param.name)
+
+        param = self.graph.getParamNode(node, column)
+        temp = param.rate
+
+        while high:
+            weight = 1-abs(param.value-high.value)/rang
+            high.rate = temp * weight
+            temp = high.rate
+            param = high
+            high = self.graph.getGreaterNode(param.name)
+
+    def setObjectRate(self, node):
+        fact = 1/len(self.maxima)
+        for param in node.edges:
+            node.rate += fact * self.graph.getParamNode(node, param).rate
+        return node.rate
+
+    def getSimilarity(self, node):
+        for param in self.headers:
+            self.setSimilarityValues(node, param)
+        similarNodes = dict()
+        for obj in self.graph.Nodes:
+            if obj.type == "object":
+                similarNodes[obj.name] = self.setObjectRate(obj)
+        names = sorted(similarNodes.items(), key=lambda x: x[1], reverse=True)
+        objList = []
+        for i in names:
+            objList.append(self.graph.getNodeByName(i[0]))
+        return objList
