@@ -175,7 +175,7 @@ class Database:
             if param:
                 self.graph.addEdge(name, param.name)
             else:
-                self.graph.addEdge(name, "Param_"+str(self.headers[i])+str(fields[i]))
+                self.graph.addEdge(name, "Param_"+str(self.headers[i])+str(float(fields[i])))
         return node
 
     def delSingleObject(self, name):
@@ -266,18 +266,16 @@ class Database:
         node = self.addSingleObject(fields)
         for i in range(len(fields)):
             self.setSimilarityValues(node, self.headers[i])
-        similarNodes = dict()
         corr = len(self.headers)/(len(self.headers)-1)
-        prediction = [0] * len(self.graph.getNodeByName("Param_class").edges)
-        counts = [0] * len(self.graph.getNodeByName("Param_class").edges)
+        classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
+        prediction = [0] * len(classes)
+        counts = [0] * len(classes)
         for obj in self.graph.Nodes:
-            if obj.type == "object":
-                similarNodes[obj.name] = self.setObjectRate(obj)*corr
-                if node.name != obj.name:
-                    for i in range(len(prediction)):
-                        if obj.edges[len(self.headers)-1] == self.graph.getNodeByName("Param_class").edges[i]:
-                            prediction[i] += similarNodes[obj.name]
-                            counts[i] += 1
+            if obj.type == "object" and node.name != obj.name:
+                for i in range(len(prediction)):
+                    if obj.edges[len(self.headers)-1] == classes[i]:
+                        prediction[i] += self.setObjectRate(obj)*corr
+                        counts[i] += 1
         for i in range(len(prediction)):
             prediction[i] = prediction[i]/counts[i]
         self.delSingleObject(node.name)
