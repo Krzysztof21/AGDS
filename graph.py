@@ -11,6 +11,9 @@ class Node:
         self.edges = edges
         self.rate = 0
 
+    def __str__(self):
+        return str(self.name)
+
     def __repr__(self):
         return "\nName: " + str(self.name) + ", type: " + str(self.type) + ", value: " + str(self.value) + ", connected nodes: " + str(self.edges) + ", similarity index: " + str(self.rate)
 
@@ -28,8 +31,8 @@ class Graph:
         if any(node.name == name for node in self.Nodes):
             print("Node already exists")
         else:
-            self.Nodes.append(Node(name, type, value, edges))
-            node = self.Nodes[len(self.Nodes)-1]
+            node = Node(name, type, value, edges)
+            self.Nodes.append(node)
         return node
 
     def delNode(self, name):
@@ -49,12 +52,9 @@ class Graph:
         pass
 
     def getNodeByName(self, name):
-        for i in range(len(self.Nodes)):
-            if self.Nodes[i].name == name:
-                node = self.Nodes[i]
+        for node in self.Nodes:
+            if node.name == name:
                 return node
-        msg = "Node with <" + str(name) + "> name does not exists"
-        #print(msg)
         return None
 
     def getNodeByValue(self, value, column):
@@ -62,8 +62,6 @@ class Graph:
             if self.Nodes[i].value == value and self.Nodes[i].edges[0] == column:
                 node = self.Nodes[i]
                 return node
-        msg = "Node with " + str(value) + " value does not exists"
-        #print(msg)
         return None
 
     def getParamNode(self, node, param):
@@ -71,11 +69,11 @@ class Graph:
             if param in node.edges[i]:
                 return self.getNodeByName(node.edges[i])
 
-    def getLowerNode(self, name):
-        return self.getNodeByName(self.getNodeByName(name).edges[1])
+    def getLowerNode(self, node):
+        return self.getNodeByName(node.edges[1])
 
-    def getGreaterNode(self, name):
-        return self.getNodeByName(self.getNodeByName(name).edges[2])
+    def getGreaterNode(self, node):
+        return self.getNodeByName(node.edges[2])
 
 class Database:
 
@@ -87,6 +85,7 @@ class Database:
         self.objectCount = 0
 
     def loadData(self, filename):
+        self.graph.Nodes = []
         self.addParameters(filename)
         self.addObjects(filename)
 
@@ -97,6 +96,7 @@ class Database:
             print(self.headers)
             for i in range(len(self.headers)):
                 param = "Param_" + str(self.headers[i])
+                print(param)
                 self.graph.addNode(param, "param", self.headers[i])
                 self.addColumn(filename, self.headers[i])
 
@@ -121,28 +121,33 @@ class Database:
             if self.minima.get(column) and self.maxima.get(column) and node.value > self.minima[column].value and node.value < self.maxima[column].value:
                 nextNode = self.minima[column]
                 while nextNode.value < value:
-                    nextNode = self.graph.getGreaterNode(nextNode.name)
+                    nextNode = self.graph.getGreaterNode(nextNode)
                 else:
-                    node.edges.append(self.graph.getLowerNode(nextNode.name).name)
+                    node.edges.append(self.graph.getLowerNode(nextNode).name)
                     node.edges.append(nextNode.name)
-                    self.graph.getLowerNode(nextNode.name).edges[2] = name
+                    self.graph.getLowerNode(nextNode).edges[2] = name
                     nextNode.edges[1] = name
             return node
 
     def delValue(self, name):
         param = self.graph.getNodeByName(name)
-        col = name[6:9]
+        col = self.graph.getNodeByName(param.edges[0]).name
         if not param:
             return "Value already deleted"
         if len(param.edges) > 3:
             return "Value still used"
         if param.edges[1] == "NULL":
-            self.minima[col] = self.graph.getGreaterNode(name).edges[1] = 'NULL'
+            node = self.graph.getGreaterNode(param)
+            node.edges[1] = 'NULL'
+            self.minima[col] = node
         elif param.edges[2] == "NULL":
-            self.maxima[col] = self.graph.getLowerNode(name).edges[2] = 'NULL'
+            node = self.graph.getLowerNode(param)
+            node.edges[2] = 'NULL'
+            self.maxima[col] = node
         else:
-            self.graph.getGreaterNode(param.name).edges[1] = param.edges[1]
-            self.graph.getLowerNode(param.name).edges[2] = param.edges[2]
+            self.graph.getGreaterNode(param).edges[1] = param.edges[1]
+            self.graph.getLowerNode(param).edges[2] = param.edges[2]
+        print(name + " deleted")
         self.graph.Nodes.remove(param)
 
     def addColumn(self, filename, column):
@@ -167,7 +172,6 @@ class Database:
                     self.graph.addEdge(col + str(saved_column[i]), col + str(saved_column[i + 1]))
 
     def addSingleObject(self, fields):
-        self.objectCount += 1
         name = "Obj" + str(self.objectCount)
         node = self.graph.addNode(name,"object", None)
         for i in range(len(fields)):
@@ -176,6 +180,7 @@ class Database:
                 self.graph.addEdge(name, param.name)
             else:
                 self.graph.addEdge(name, "Param_"+str(self.headers[i])+str(float(fields[i])))
+        self.objectCount += 1
         return node
 
     def delSingleObject(self, name):
@@ -213,15 +218,15 @@ class Database:
             middle = m.floor(self.objectCount/2)
             while c != middle:
                 c += (len(node.edges)-3)
-                node = self.graph.getGreaterNode(node.name)
+                node = self.graph.getGreaterNode(node)
 
-    def setSimilarityValues(self, node, column):
-        '''Given a node and a parameter method calculates similarity for each value of parameter'''
+    def setParamSimilarity(self, node, column):
+        '''Given a node and a parameter, method calculates similarity for each value of parameter'''
         param = self.graph.getParamNode(node, column)
         temp = param.rate
         param.rate = 1
-        low = self.graph.getLowerNode(param.name)
-        high = self.graph.getGreaterNode(param.name)
+        low = self.graph.getLowerNode(param)
+        high = self.graph.getGreaterNode(param)
         rang = self.maxima["Param_"+column].value-self.minima["Param_"+column].value
 
         while low:
@@ -229,7 +234,7 @@ class Database:
             low.rate = temp * weight
             temp = low.rate
             param = low
-            low = self.graph.getLowerNode(param.name)
+            low = self.graph.getLowerNode(param)
 
         param = self.graph.getParamNode(node, column)
         temp = param.rate
@@ -239,17 +244,54 @@ class Database:
             high.rate = temp * weight
             temp = high.rate
             param = high
-            high = self.graph.getGreaterNode(param.name)
+            high = self.graph.getGreaterNode(param)
+
+    def setKParamSimilarity(self, node, column, k):
+        '''
+        Given a node and a parameter, method calculates
+        similarity for ~k nearest values of parameter
+        '''
+        param = self.graph.getParamNode(node, column)
+        param.rate = 1
+        temp = param.rate
+        low = self.graph.getLowerNode(param)
+        high = self.graph.getGreaterNode(param)
+        rang = self.maxima["Param_" + column].value - self.minima["Param_" + column].value
+        kRange = m.ceil(k/2)
+        i = 0
+
+        while low and i < kRange:
+            weight = 1 - abs(param.value - low.value) / rang
+            low.rate = temp * weight
+            temp = low.rate
+            param = low
+            low = self.graph.getLowerNode(param)
+            i += 1
+
+        param = self.graph.getParamNode(node, column)
+        temp = param.rate
+
+        i = 0
+        while high and i < kRange:
+            weight = 1 - abs(param.value - high.value) / rang
+            high.rate = temp * weight
+            temp = high.rate
+            param = high
+            high = self.graph.getGreaterNode(param)
+            i += 1
 
     def setObjectRate(self, node):
-        factor = 1/len(self.maxima)
-        for param in node.edges:
-            node.rate += factor * self.graph.getParamNode(node, param).rate
+        factor = 1/(len(self.maxima)-1)
+        if node.rate == 0:
+            for param in node.edges:
+                node.rate += factor * self.graph.getParamNode(node, param).rate
         return node.rate
 
     def getSimilarity(self, node):
         for param in self.headers:
-            self.setSimilarityValues(node, param)
+            if param != "class":
+                self.setParamSimilarity(node, param)
+        corr = len(self.headers) / (len(self.headers) - 1)
         similarNodes = dict()
         for obj in self.graph.Nodes:
             if obj.type == "object":
@@ -258,14 +300,40 @@ class Database:
         objList = []
         for i in names:
             objList.append(self.graph.getNodeByName(i[0]))
-        for nd in self.graph.Nodes:
-            nd.rate = 0
         return objList
 
-    def getClassPrediction(self, fields):
+    def getKSimilarity(self, node, k):
+        for param in self.headers:
+            if param != "class":
+                self.setKParamSimilarity(node, param, k)
+
+        similarNodes = dict()
+        j = 0
+        for value in self.graph.Nodes:
+            #if j >= 2*k:
+            #    break
+            if value.rate != 0 and value.type == "value":
+                for i in range(len(value.edges)):
+                    #if j >= 2*k:
+                    #    break
+                    if i > 2:
+                        temp = self.graph.getNodeByName(value.edges[i])
+                        similarNodes[temp.name] = self.setObjectRate(temp)
+                        j += 1
+        names = sorted(similarNodes.items(), key=lambda x: x[1], reverse=True)
+        objList = []
+        for i in names:
+            objList.append(self.graph.getNodeByName(i[0]))
+        return objList
+
+    def getClassPredictionMeanSimilarity(self, fields):
+        '''
+        Class predicted by calculating mean similarity rate
+        between given data and each class.
+        '''
         node = self.addSingleObject(fields)
         for i in range(len(fields)):
-            self.setSimilarityValues(node, self.headers[i])
+            self.setParamSimilarity(node, self.headers[i])
         corr = len(self.headers)/(len(self.headers)-1)
         classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
         prediction = [0] * len(classes)
@@ -282,3 +350,52 @@ class Database:
         for nd in self.graph.Nodes:
             nd.rate = 0
         return prediction
+
+    def getClassPredictionKNN(self, fields, k):
+        '''
+        Class predicted with k nearest neighbours algorithm
+        '''
+        node = self.addSingleObject(fields)
+        classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
+        prediction = [0] * len(classes)
+        simList = self.getSimilarity(node)
+        for i in range(k):
+            for j in range(len(prediction)):
+                if simList[i].edges[-1] == classes[j]:
+                    prediction[j] += 1
+        for i in range(len(prediction)):
+            prediction[i] = prediction[i]/k
+        self.delSingleObject(node.name)
+        for nd in self.graph.Nodes:
+            nd.rate = 0
+        return prediction
+
+    def getClassPredictionKNNFast(self, fields, k, printSimList = False):
+        '''
+        Class predicted with k nearest neighbours algorithm
+        with calculations performed for only the nearest points
+        '''
+        node = self.addSingleObject(fields)
+        #print(self.graph.Nodes)
+        classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
+        prediction = [0] * len(classes)
+        simList = self.getKSimilarity(node,k)
+        if printSimList:
+            print(simList[:(k+1)])
+            print("SimList length: " + str(len(simList)))
+        for i in range(k):
+            for j in range(len(prediction)):
+                if simList[i].edges[-1] == classes[j]:
+                    prediction[j] += 1
+        for i in range(len(prediction)):
+            prediction[i] = prediction[i]/k
+        self.delSingleObject(node.name)
+        for nd in self.graph.Nodes:
+            nd.rate = 0
+        return prediction
+
+
+
+    def getDiffPrediction(self, fields):
+        node = self.addSingleObject(fields.append(1))
+        simVal = self.getSimilarity(node)
