@@ -15,7 +15,8 @@ class Node:
         return str(self.name)
 
     def __repr__(self):
-        return "\nName: " + str(self.name) + ", type: " + str(self.type) + ", value: " + str(self.value) + ", connected nodes: " + str(self.edges) + ", similarity index: " + str(self.rate)
+        nodes = [i.name for i in self.edges if not isinstance(i, str)]
+        return "\nName: " + str(self.name) + ", type: " + str(self.type) + ", value: " + str(self.value) + ", connected nodes: " + str(nodes) + ", similarity index: " + str(self.rate) + '\n'
 
 
 class Graph:
@@ -38,15 +39,16 @@ class Graph:
     def delNode(self, name):
         pass
 
-    def addEdge(self, name1, name2):
-        if (self.getNodeByName(name1) or name1 == "NULL") and (self.getNodeByName(name2) or name2 == "NULL"):
-            if name1 == "NULL":
-                self.getNodeByName(name2).edges.append(name1)
-            if name2 == "NULL":
-                self.getNodeByName(name1).edges.append(name2)
-            if name1 != "NULL" and name2 != "NULL":
-                self.getNodeByName(name1).edges.append(name2)
-                self.getNodeByName(name2).edges.append(name1)
+    def addEdge(self, node1, node2):
+
+        if node1 and node2:
+            if node1 == "NULL":
+                node2.edges.append(node1)
+            if node2 == "NULL":
+                node1.edges.append(node2)
+            if node1 != "NULL" and node2 != "NULL":
+                node2.edges.append(node1)
+                node1.edges.append(node2)
 
     def delEdge(self):
         pass
@@ -58,155 +60,197 @@ class Graph:
         return None
 
     def getNodeByValue(self, value, column):
-        for i in range(len(self.Nodes)):
-            if self.Nodes[i].value == value and self.Nodes[i].edges[0] == column:
-                node = self.Nodes[i]
+        '''
+
+        :param value: [string] Value of the column parameter to be searched
+        :param column: [Node object] Column to be searched
+        :return: Node object if found
+                 None if not found
+        '''
+        for node in column.edges:
+            if node.value == value:
                 return node
         return None
 
     def getParamNode(self, node, param):
-        for i in range(len(node.edges)):
-            if param in node.edges[i]:
-                return self.getNodeByName(node.edges[i])
+        '''
+
+        :param node: [Node object] Data object
+        :param param: [Node object] Parameter of data object to be found
+        :return: Node object representing parameter value
+        '''
+        for value in node.edges:
+            if param.name in value.name:
+                return value
 
     def getLowerNode(self, node):
-        return self.getNodeByName(node.edges[1])
+
+        return node.edges[1]
 
     def getGreaterNode(self, node):
-        return self.getNodeByName(node.edges[2])
+
+        return node.edges[2]
 
 class Database:
 
     minima = dict()
     maxima = dict()
+    parameterNodes = []
 
     def __init__(self, name):
         self.graph = Graph(name)
         self.objectCount = 0
+
+    #
+    #LOADING SECTION
+    #
 
     def loadData(self, filename):
         self.graph.Nodes = []
         self.addParameters(filename)
         self.addObjects(filename)
 
-    def addParameters(self, filename):
-        with open(filename) as csv_file:
+    def addParameters(self, file):
+        with open(file) as csv_file:
             d_reader = csv.DictReader(csv_file)
             self.headers = d_reader.fieldnames
             print(self.headers)
             for i in range(len(self.headers)):
-                param = "Param_" + str(self.headers[i])
-                print(param)
-                self.graph.addNode(param, "param", self.headers[i])
-                self.addColumn(filename, self.headers[i])
+                name = "Param_" + str(self.headers[i])
+                print(name)
+                column = self.graph.addNode(name, "param", self.headers[i])
+                self.parameterNodes.append(column)
+                self.addColumn(file, column)
+
+    def addObjects(self, file):
+        '''Adding objects (specific row of data)
+
+        :param file: opened file from calling namespace
+        :return: None
+        '''
+        with open(file) as csv_file:
+            obj = pd.read_csv(csv_file).values
+            for i in range(len(obj)):
+                self.addSingleObject(obj[i, :])
+
+    def addColumn(self, file, column):
+        '''Adding all values of a parameter, deleting duplicates, saving minimum and maximum
+
+        :param file: opened file from calling namespace
+        :param column: object of type Node, representing name of a parameter of data
+        :return: None
+        '''
+        df = pd.read_csv(file)
+        saved_column = sorted(list(map(float, set(df[column.name[6:]]))))
+
+        tempNode = self.addValue(saved_column[0], column)
+        for i in range(len(saved_column)):
+            if i == 0:
+                node = self.addValue(saved_column[i + 1], column)
+                self.minima[column.name] = tempNode
+                self.graph.addEdge("NULL", tempNode)
+                self.graph.addEdge(tempNode, node)
+            elif i == len(saved_column)-1:
+                self.maxima[column.name] = tempNode
+                self.graph.addEdge(tempNode, "NULL")
+                break
+            else:
+                node = self.addValue(saved_column[i + 1], column)
+                self.graph.addEdge(tempNode, node)
+            tempNode = node
 
     def addValue(self, value, column):
-        if self.graph.getNodeByValue(value, column):
-            #print("Value already exists")
-            return None
+        '''Adding value node, updating minima or maxima if neccessary
+
+        :param value: Value of the parameter to be added (possibly str or numerical)
+        :param column: Appropriate parameter node
+        :return: Node object, if created correctly
+
+        '''
+        alreadyNode = self.graph.getNodeByValue(value, column)
+        if alreadyNode:
+            return alreadyNode
         else:
-            name = column + str(value)
+            name = column.name + str(value)
             node = self.graph.addNode(name, "value", value)
-            self.graph.addEdge(name, column)
-            if self.minima.get(column) and node.value < self.minima[column].value:
-                self.minima[column].edges[1] = name
-                self.graph.addEdge("NULL",  node.name)
-                node.edges.append(self.minima[column].name)
-                self.minima[column] = node
-            if self.maxima.get(column) and node.value > self.maxima[column].value:
-                self.maxima[column].edges[2] = name
-                node.edges.append(self.maxima[column].name)
-                self.graph.addEdge("NULL",  node.name)
-                self.maxima[column] = node
-            if self.minima.get(column) and self.maxima.get(column) and node.value > self.minima[column].value and node.value < self.maxima[column].value:
-                nextNode = self.minima[column]
+            self.graph.addEdge(node, column)
+            if self.minima.get(column.name) and node.value < self.minima[column.name].value:
+                self.minima[column.name].edges[1] = node
+                self.graph.addEdge("NULL",  node)
+                node.edges.append(self.minima[column.name])
+                self.minima[column.name] = node
+            if self.maxima.get(column.name) and node.value > self.maxima[column.name].value:
+                self.maxima[column.name].edges[2] = name
+                node.edges.append(self.maxima[column.name])
+                self.graph.addEdge("NULL",  node)
+                self.maxima[column.name] = node
+            if self.minima.get(column.name) and self.maxima.get(column.name) and node.value > self.minima[column.name].value and node.value < self.maxima[column.name].value:
+                nextNode = self.minima[column.name]
                 while nextNode.value < value:
                     nextNode = self.graph.getGreaterNode(nextNode)
                 else:
-                    node.edges.append(self.graph.getLowerNode(nextNode).name)
-                    node.edges.append(nextNode.name)
-                    self.graph.getLowerNode(nextNode).edges[2] = name
-                    nextNode.edges[1] = name
+                    prevNode = self.graph.getLowerNode(nextNode)
+                    node.edges.append(prevNode)
+                    node.edges.append(nextNode)
+                    prevNode.edges[2] = node
+                    nextNode.edges[1] = node
             return node
 
-    def delValue(self, name):
-        param = self.graph.getNodeByName(name)
-        col = self.graph.getNodeByName(param.edges[0]).name
-        if not param:
+    def delValue(self, node):
+        column = node.edges[0]
+        if not node:
             return "Value already deleted"
-        if len(param.edges) > 3:
+        if len(node.edges) > 3:
             return "Value still used"
-        if param.edges[1] == "NULL":
-            node = self.graph.getGreaterNode(param)
-            node.edges[1] = 'NULL'
-            self.minima[col] = node
-        elif param.edges[2] == "NULL":
-            node = self.graph.getLowerNode(param)
-            node.edges[2] = 'NULL'
-            self.maxima[col] = node
+        if node.edges[1] == "NULL":
+            tempNode = self.graph.getGreaterNode(node)
+            tempNode.edges[1] = 'NULL'
+            self.minima[column.name] = tempNode
+        elif node.edges[2] == "NULL":
+            tempNode = self.graph.getLowerNode(node)
+            tempNode.edges[2] = 'NULL'
+            self.maxima[column.name] = tempNode
         else:
-            self.graph.getGreaterNode(param).edges[1] = param.edges[1]
-            self.graph.getLowerNode(param).edges[2] = param.edges[2]
-        print(name + " deleted")
-        self.graph.Nodes.remove(param)
-
-    def addColumn(self, filename, column):
-        with open(filename) as csv_file:
-            df = pd.read_csv(csv_file)
-            saved_column = sorted(list(map(float, set(df[column]))))
-            col = "Param_" + str(column)
-            for i in range(len(saved_column)):
-                if i == 0:
-                    self.minima[col] = self.addValue(saved_column[i], col)
-                elif i == len(saved_column)-1:
-                    self.maxima[col] = self.addValue(saved_column[i], col)
-                else:
-                    self.addValue(saved_column[i], col)
-            for i in range(len(saved_column)):
-                if i == 0:
-                    self.graph.addEdge("NULL", col+str(saved_column[i]))
-                    self.graph.addEdge(col + str(saved_column[i]), col + str(saved_column[i+1]))
-                elif i == len(saved_column)-1:
-                    self.graph.addEdge(col + str(saved_column[i]), "NULL")
-                else:
-                    self.graph.addEdge(col + str(saved_column[i]), col + str(saved_column[i + 1]))
+            self.graph.getGreaterNode(node).edges[1] = node.edges[1]
+            self.graph.getLowerNode(node).edges[2] = node.edges[2]
+        if node in self.graph.Nodes:
+            self.graph.Nodes.remove(node)
 
     def addSingleObject(self, fields):
+        '''Adds single object with given parameters values
+
+        :param fields: Paramteres of added object
+        :return: Node object
+        '''
         name = "Obj" + str(self.objectCount)
         node = self.graph.addNode(name,"object", None)
         for i in range(len(fields)):
-            param = self.addValue(fields[i],"Param_"+str(self.headers[i]))
+            param = self.addValue(fields[i], self.parameterNodes[i])
             if param:
-                self.graph.addEdge(name, param.name)
-            else:
-                self.graph.addEdge(name, "Param_"+str(self.headers[i])+str(float(fields[i])))
+                self.graph.addEdge(node, param)
         self.objectCount += 1
         return node
 
-    def delSingleObject(self, name):
-        node = self.graph.getNodeByName(name)
+    def delSingleObject(self, node):
         if not node:
             return "Object already deleted"
-        for paramName in node.edges:
-            param = self.graph.getNodeByName(paramName)
-            param.edges.remove(name)
+        for param in node.edges:
+            param.edges.remove(node)
             if len(param.edges) < 4:
-                self.delValue(paramName)
+                self.delValue(param)
         self.graph.Nodes.remove(node)
 
 
-    def addObjects(self, filename):
-        with open(filename) as csv_file:
-            obj = pd.read_csv(csv_file).values
-            for i in range(len(obj)):
-                self.addSingleObject(obj[i,:])
+    #
+    #ANALYTICS SECTION
+    #
 
     def getAverage(self, column):
         param = self.graph.getNodeByName("Param_"+str(column))
         sum = 0
         count = 0
         for i in range(len(param.edges)):
-            node = self.graph.getNodeByName(param.edges[i])
+            node = param.edges[i]
             sum += node.value*(len(node.edges)-3)
             count += len(node.edges)-3
         return sum/count
@@ -227,9 +271,9 @@ class Database:
         param.rate = 1
         low = self.graph.getLowerNode(param)
         high = self.graph.getGreaterNode(param)
-        rang = self.maxima["Param_"+column].value-self.minima["Param_"+column].value
+        rang = self.maxima[column.name].value-self.minima[column.name].value
 
-        while low:
+        while low != "NULL":
             weight = 1 - abs(param.value-low.value)/rang
             low.rate = temp * weight
             temp = low.rate
@@ -239,7 +283,7 @@ class Database:
         param = self.graph.getParamNode(node, column)
         temp = param.rate
 
-        while high:
+        while high != "NULL":
             weight = 1-abs(param.value-high.value)/rang
             high.rate = temp * weight
             temp = high.rate
@@ -256,11 +300,11 @@ class Database:
         temp = param.rate
         low = self.graph.getLowerNode(param)
         high = self.graph.getGreaterNode(param)
-        rang = self.maxima["Param_" + column].value - self.minima["Param_" + column].value
+        rang = self.maxima[column.name].value - self.minima[column.name].value
         kRange = m.ceil(k/2)
         i = 0
 
-        while low and i < kRange:
+        while low != "NULL" and i < kRange:
             weight = 1 - abs(param.value - low.value) / rang
             low.rate = temp * weight
             temp = low.rate
@@ -272,7 +316,7 @@ class Database:
         temp = param.rate
 
         i = 0
-        while high and i < kRange:
+        while high != "NULL" and i < kRange:
             weight = 1 - abs(param.value - high.value) / rang
             high.rate = temp * weight
             temp = high.rate
@@ -283,13 +327,13 @@ class Database:
     def setObjectRate(self, node):
         factor = 1/(len(self.maxima)-1)
         if node.rate == 0:
-            for param in node.edges:
-                node.rate += factor * self.graph.getParamNode(node, param).rate
+            for param in (n for n in node.edges if n.type == 'value'):
+                node.rate += factor * param.rate
         return node.rate
 
     def getSimilarity(self, node):
-        for param in self.headers:
-            if param != "class":
+        for param in self.parameterNodes:
+            if param.name != "Param_class":
                 self.setParamSimilarity(node, param)
         corr = len(self.headers) / (len(self.headers) - 1)
         similarNodes = dict()
@@ -303,8 +347,8 @@ class Database:
         return objList
 
     def getKSimilarity(self, node, k):
-        for param in self.headers:
-            if param != "class":
+        for param in self.parameterNodes:
+            if param.name != "Param_class":
                 self.setKParamSimilarity(node, param, k)
 
         similarNodes = dict()
@@ -314,10 +358,8 @@ class Database:
             #    break
             if value.rate != 0 and value.type == "value":
                 for i in range(len(value.edges)):
-                    #if j >= 2*k:
-                    #    break
                     if i > 2:
-                        temp = self.graph.getNodeByName(value.edges[i])
+                        temp = value.edges[i]
                         similarNodes[temp.name] = self.setObjectRate(temp)
                         j += 1
         names = sorted(similarNodes.items(), key=lambda x: x[1], reverse=True)
@@ -333,9 +375,9 @@ class Database:
         '''
         node = self.addSingleObject(fields)
         for i in range(len(fields)):
-            self.setParamSimilarity(node, self.headers[i])
+            self.setParamSimilarity(node, self.parameterNodes[i])
         corr = len(self.headers)/(len(self.headers)-1)
-        classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
+        classes = self.parameterNodes[-1].edges
         prediction = [0] * len(classes)
         counts = [0] * len(classes)
         for obj in self.graph.Nodes:
@@ -346,7 +388,7 @@ class Database:
                         counts[i] += 1
         for i in range(len(prediction)):
             prediction[i] = prediction[i]/counts[i]
-        self.delSingleObject(node.name)
+        self.delSingleObject(node)
         for nd in self.graph.Nodes:
             nd.rate = 0
         return prediction
@@ -356,7 +398,7 @@ class Database:
         Class predicted with k nearest neighbours algorithm
         '''
         node = self.addSingleObject(fields)
-        classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
+        classes = self.parameterNodes[-1].edges
         prediction = [0] * len(classes)
         simList = self.getSimilarity(node)
         for i in range(k):
@@ -365,7 +407,7 @@ class Database:
                     prediction[j] += 1
         for i in range(len(prediction)):
             prediction[i] = prediction[i]/k
-        self.delSingleObject(node.name)
+        self.delSingleObject(node)
         for nd in self.graph.Nodes:
             nd.rate = 0
         return prediction
@@ -377,7 +419,7 @@ class Database:
         '''
         node = self.addSingleObject(fields)
         #print(self.graph.Nodes)
-        classes = self.graph.getNodeByName("Param_" + self.headers[-1]).edges
+        classes = self.parameterNodes[-1].edges
         prediction = [0] * len(classes)
         simList = self.getKSimilarity(node,k)
         if printSimList:
@@ -389,7 +431,7 @@ class Database:
                     prediction[j] += 1
         for i in range(len(prediction)):
             prediction[i] = prediction[i]/k
-        self.delSingleObject(node.name)
+        self.delSingleObject(node)
         for nd in self.graph.Nodes:
             nd.rate = 0
         return prediction
