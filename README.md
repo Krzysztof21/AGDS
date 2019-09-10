@@ -21,7 +21,7 @@ Datasets used for testing:
 Classification accuracy results with k=5 (in percent):
 
 | Dataset\method | Mean similarity | kNN  | kNNF |
-| :-------------: | :-------------: | :-----: |
+| :-------------: | :-------------: | :-----: | :---: |
 | Iris      | 58 | 100 | 100 |
 | Wine      | 45 | 62 | 70 |
 | Cancer | 25 | 80 | 96 |
