@@ -38,3 +38,4 @@ Time comparison of the methods:
 Results on Iris dataset, other sets produce similar relations between execution times.
 
 An image representing example of database system with Iris dataset (only x records for clarity of an image):
+![alt text](https://github.com/Krzysztof21/AGDS/blob/master/image.JPG   "Iris graph database")
