@@ -19,6 +19,7 @@ Datasets used for testing:
 4. Glass Identification dataset: http://archive.ics.uci.edu/ml/datasets/Glass+Identification
 
 Classification accuracy results with k=5 (in percent):
+
 | Dataset\method| Mean similarity|kNN  |kNNF|
 | ------------- |:-------------:| -----:|
 | Iris      |58|100 |100 |
@@ -27,6 +28,7 @@ Classification accuracy results with k=5 (in percent):
 |Glass  |15|30|55|
 
 Time comparison of the methods:
+
 |Method|Time (s)|
 |Mean|0.034|
 |kNN|0.105|
