@@ -13,10 +13,10 @@ rate are selected and whichever class is the most frequent in this set, it is as
 parameter values are the closest to the values of the record in question
 
 Datasets used for testing:
-1. Iris dataset: http://archive.ics.uci.edu/ml/datasets/Iris
-2. Wine dataset: http://archive.ics.uci.edu/ml/datasets/Wine
-3. Wisconsin Cancer dataset: http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Original%29
-4. Glass Identification dataset: http://archive.ics.uci.edu/ml/datasets/Glass+Identification
+1. [Iris dataset](http://archive.ics.uci.edu/ml/datasets/Iris)
+2. [Wine dataset](http://archive.ics.uci.edu/ml/datasets/Wine)
+3. [Wisconsin Cancer dataset](http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Original%29)
+4. [Glass Identification dataset](http://archive.ics.uci.edu/ml/datasets/Glass+Identification)
 
 Classification accuracy results with k=5 (in percent):
 
@@ -35,4 +35,6 @@ Time comparison of the methods:
 | kNN | 0.105 |
 | kNNF | 0.085 |
 
-Results on Iris dataset, other sets produce similar relations between execution times. 
+Results on Iris dataset, other sets produce similar relations between execution times.
+
+An image representing example of database system with Iris dataset (only x records for clarity of an image):
