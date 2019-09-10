@@ -20,17 +20,19 @@ Datasets used for testing:
 
 Classification accuracy results with k=5 (in percent):
 
-| Dataset\method| Mean similarity|kNN  |kNNF|
-| ------------- |:-------------:| -----:|
-| Iris      |58|100 |100 |
-| Wine      |45|62 |70|
-| Cancer | 25| 80 |96|
-|Glass  |15|30|55|
+| Dataset\method | Mean similarity | kNN  | kNNF |
+| :-------------: | :-------------: | :-----: |
+| Iris      | 58 | 100 | 100 |
+| Wine      | 45 | 62 | 70 |
+| Cancer | 25 | 80 | 96 |
+| Glass  | 15 | 30 | 55 |
 
 Time comparison of the methods:
 
-|Method|Time (s)|
-|Mean|0.034|
-|kNN|0.105|
-|kNNF|0.085|
+| Method | Time (s) |
+| :---: | :---: |
+| Mean | 0.034 |
+| kNN | 0.105 |
+| kNNF | 0.085 |
+
 Results on Iris dataset, other sets produce similar relations between execution times. 
